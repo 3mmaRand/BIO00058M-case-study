@@ -1,0 +1,130 @@
+---
+title: "Functional heterogeneity in Mesenchymal stromal cell (MSC) subtypes."
+author: "Emma Rand"
+output:
+  html_document:
+    df_print: paged
+  bookdown::html_document2: default
+  bookdown::pdf_document2: default
+  bookdown::word_document2: default
+bibliography: refs.bib
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.retina = 3)
+```
+
+```{r pkg}
+library(tidyverse)
+```
+
+# Introduction
+
+Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies.  The Genever Group has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes. The phenotypes of these subtypes is as follows:
+
+* Y201   : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
+* Y101   : osteogenic capacity
+* Y202   : immundomodulatory capacity
+* Y102   : immundomodulatory capacity
+* Y101.5 : enhanced osteogenic capacity
+
+The data are mass spectrometry data of the soluble protein fraction from five immortalised mesenchymal stromal cell (MSC) lines. 
+
+# Raw data description
+
+The data are normalised protein abundances. Each row is a protein and there are three replicates for each subtype which are arranged in columns. Also in the file are columns for:
+
+* the protein accessions: the top hit is first, Human sequences are prefixed with `1::`, bovine with `2::`
+* the number of peptides used to identify the protein
+* the number of unique peptides used to identify the protein
+* a measure of confidence in that identification
+* the maximum fold change between the mean abundances of two cell lines (i.e., highest mean / lowest mean)
+* a p value for a comparison test between the highest mean and lowest mean
+* a q value (corrected p value)
+* a measure of the power of that test
+* the cell line with the highest mean
+* the cell line with the lowest mean
+* the protein mass
+* a description of the protein
+* a binary indicator variable for whether at least two peptides were detected for a protein.
+
+
+```{r data-import}
+# file
+filesol <- "../data-raw/Y101_Y102_Y201_Y202_Y101-5.csv"
+# Column names are spread over three rows but are primarily in the third row.
+# skip first two lines
+sol <- read_csv(filesol, skip = 2) %>% 
+  janitor::clean_names()
+```
+
+```{r data-filter}
+# Remove irrelevant rows
+
+# bovine serum proteins removed - these are from medium on which the cells were grown 
+# proteins for which fewer than 2 peptides were detected
+sol <- sol %>% 
+  filter(str_detect(description, "OS=Homo sapiens")) %>% 
+  filter(x1pep == "x")
+num_prot <- length(sol$accession) 
+```
+
+
+```{r add-useful-columns}
+# Extract important information 'hidden' in other columns to columns of their own
+
+# extract the genename from the description and put it in a column.
+# genename is after GN= in the description until a white space
+sol <- sol %>%
+  mutate(genename =  str_extract(description,"GN=[^\\s]+") %>% 
+           str_replace("GN=", ""))
+
+# Add a column, protid, for the top protein identifier. 
+# This is the first Uniprot ID after the "1::" in the accession column.
+sol <- sol %>%
+  mutate(protid =  str_extract(accession, "1::[^;]+") %>% 
+           str_replace("1::", ""))
+```
+
+
+```{r create-long-sol2}
+# Create a second dataframe, sol2 in which the protein abundances are in a single column
+# these are the columns beginning with a y
+# the column names which indicate the cell lineage and replicate
+# good to a column named lineage_rep which is then split into separate columns
+# All the other variables are retained.
+sol2 <- sol %>% pivot_longer(names_to = "lineage_rep",
+                             values_to = "abundance",
+                             cols = starts_with("y")) %>%
+  extract(lineage_rep,
+          c("line", "rep"),
+          "(y[0-9]{3,4})\\_([a-c])")
+```
+
+
+
+# Methods
+I used R [@R-core] with tidyverse packages [@R-tidyverse] to import and process the raw data.
+Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out.
+
+# Results
+There were `r num_prot` human protein identified from more than two peptides.
+
+
+
+## Word count
+Word count calculated with ..
+```{r wordcount}
+wc_main <- wordcountaddin:::text_stats("main.Rmd")[3] %>% str_extract("[0-9]+") %>% as.numeric()
+wc_readme <- wordcountaddin:::text_stats("../README.md")[3] %>% str_extract("[0-9]+") %>% as.numeric()
+
+```
+
+This doc: `r wc_main`  
+The README: `r wc_readme`  
+Total: `r wc_main + wc_readme`  
+
+# References
