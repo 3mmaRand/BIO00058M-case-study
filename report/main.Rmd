@@ -21,8 +21,13 @@ knitr::opts_chunk$set(echo = FALSE,
 library(tidyverse)
 ```
 
-# Introduction
+```{r functions}
+# data_summary calculates summary statistics (mean, sample size, standard deviation, standard error) for a numeric variable
+source("../scripts/data_summary.R")
+```
 
+# Introduction
+<!-- add refs -->
 Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies.  The Genever Group has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes. The phenotypes of these subtypes is as follows:
 
 * Y201   : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
@@ -59,6 +64,12 @@ filesol <- "../data-raw/Y101_Y102_Y201_Y202_Y101-5.csv"
 # skip first two lines
 sol <- read_csv(filesol, skip = 2) %>% 
   janitor::clean_names()
+
+file <- "../data-raw/comparison_p_and_q.csv"
+p_q <- read_csv(file) %>% 
+  janitor::clean_names()
+
+
 ```
 
 ```{r data-filter}
@@ -70,6 +81,11 @@ sol <- sol %>%
   filter(str_detect(description, "OS=Homo sapiens")) %>% 
   filter(x1pep == "x")
 num_prot <- length(sol$accession) 
+
+p_q <- p_q %>% 
+  filter(str_detect(description, "OS=Homo sapiens")) %>% 
+  filter(x1pep == "x")
+
 ```
 
 
@@ -82,11 +98,17 @@ sol <- sol %>%
   mutate(genename =  str_extract(description,"GN=[^\\s]+") %>% 
            str_replace("GN=", ""))
 
+p_q <- p_q %>%
+  mutate(genename =  str_extract(description,"GN=[^\\s]+") %>% 
+           str_replace("GN=", ""))
+
+
 # Add a column, protid, for the top protein identifier. 
 # This is the first Uniprot ID after the "1::" in the accession column.
 sol <- sol %>%
   mutate(protid =  str_extract(accession, "1::[^;]+") %>% 
            str_replace("1::", ""))
+
 ```
 
 
@@ -104,7 +126,37 @@ sol2 <- sol %>% pivot_longer(names_to = "lineage_rep",
           "(y[0-9]{3,4})\\_([a-c])")
 ```
 
+```{r summary-sol}
+# Add columns for means for each cell line and genes
+# add a dataframe for the mean, se, sd, and n abundance for each cell line
+sol_summary <- data_summary(sol2, 
+                            measure = abundance, 
+                            group1 = line,
+                            group2 = protid)
 
+# reformat so these can be added as column to the data set
+sol_summary <- sol_summary %>% 
+  pivot_wider(names_from = line,
+              values_from = c(mean, n, sd, se))
+# merge the dataframes
+sol <- merge(sol, sol_summary, by = "protid")
+```
+
+```{r}
+# calculate the log fold changes for each of the comparisons
+# we have p values for. This is all the pairwaise comparisions
+# except that y1015 is commpared only to y101, no others
+sol <- sol %>% 
+  mutate(fc_y101_y1015 = log2(mean_y101/mean_y1015), # have p
+         fc_y101_y102 = log2(mean_y101/mean_y102), # have p
+         fc_y101_y201 = log2(mean_y101/mean_y201), # have p
+         fc_y101_y202 = log2(mean_y101/mean_y202), # have p
+         ##
+         fc_y102_y201 = log2(mean_y102/mean_y201), # have p
+         fc_y102_y202 = log2(mean_y102/mean_y202), # have p
+         ##
+         fc_y201_y202 = log2(mean_y201/mean_y202)) # have p
+```
 
 # Methods
 I used R [@R-core] with tidyverse packages [@R-tidyverse] to import and process the raw data.
@@ -113,6 +165,67 @@ Bovine serum proteins from the medium on which the cells were grown and those fo
 # Results
 There were `r num_prot` human protein identified from more than two peptides.
 
+```{r pca-preparation}
+# PCA requires the proteins to be in columns and the samples to be in rows
+# Transpose the columns containing the abundance values
+tsol <- sol %>% select(starts_with("y")) %>%
+  t() %>% 
+  data.frame()
+
+# Use the genenames in `sol` to name the columns in `tsol`
+# I'm using the genenames rather than the protein ids because they
+# are more recognisable
+names(tsol) <- sol$genename 
+
+# The sample names of sol have become the row names of tsol
+# put these in a column 'sample
+tsol$sample <- row.names(tsol)
+
+# process the sample name so we have the cell lineage in one column and the replicate in another
+tsol <- tsol %>% 
+  extract(sample, 
+          c("lineage","rep"),
+          "(y[0-9]{3,4})\\_([a-c])")
+```
+
+```{r pca-run}
+pca <- tsol %>% 
+  select(-lineage, -rep) %>%
+  prcomp(scale. = TRUE)
+```
+
+```{r}
+res <- summary(pca)[["importance"]]
+
+percent1 <- res["Cumulative Proportion","PC1"] * 100
+percent6 <- res["Cumulative Proportion","PC6"] * 100
+```
+
+
+
+```{r pca-vis}
+pca_labelled <- data.frame(pca$x, lineage = tsol$lineage)
+# a then to do a scatterplot
+ggplot(pca_labelled, aes(x = PC1, y = PC2, color = lineage)) +
+  geom_point()
+```
+
+
+
+
+```{r volcano-prep}
+sol <- merge(sol, p_q, by = "genename")
+```
+
+```{r}
+sol %>% 
+  ggplot(aes(x = fc_y101_y1015, 
+             y = -log(q_y101_y1015),
+             colour = abs(fc_y101_y1015) > 2 & q_y101_y1015 < 0.05)) +
+  geom_point() +
+  theme_classic() +
+  theme(legend.position = "none")
+```
 
 
 ## Word count
