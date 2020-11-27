@@ -9,7 +9,7 @@ output:
   bookdown::word_document2: default
 bibliography: refs.bib
 ---
-  
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, 
                       warning = FALSE,
@@ -19,59 +19,70 @@ knitr::opts_chunk$set(echo = FALSE,
 
 ```{r pkg}
 library(tidyverse)
+library(heatmaply)
+library(GGally)
 ```
 
 ```{r functions}
-# data_summary calculates summary statistics (mean, sample size, standard deviation, standard error) for a numeric variable
-source("../scripts/data_summary.R")
+# data_summary calculates summary statistics (mean, sample size, standard deviation, standard error) for a numeric variable. Used to summarise the protein abundances for each cell line
+source("functions/data_summary.R")
+# z_score performs z score normalisation on a vector of values
+source("functions/z_score.R")
 ```
 
 # Introduction
-<!-- add refs -->
-Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies.  The Genever Group has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes. The phenotypes of these subtypes is as follows:
 
-* Y201   : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
-* Y101   : osteogenic capacity
-* Y202   : immundomodulatory capacity
-* Y102   : immundomodulatory capacity
-* Y101.5 : enhanced osteogenic capacity
+Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity [@Costa2020-ze; @Phinney2012-yw] and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies. The Genever Group has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes [@Stone2019-wr; @Kay2019-ec]. The phenotypes of these subtypes is as follows:
 
-The data are mass spectrometry data of the soluble protein fraction from five immortalised mesenchymal stromal cell (MSC) lines. 
+-   Y201 : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
+-   Y101 : osteogenic capacity
+-   Y202 : immundomodulatory capacity
+-   Y102 : immundomodulatory capacity
+-   Y101.5 : enhanced osteogenic capacity
+
+The data are mass spectrometry data of the soluble protein fraction from five immortalised mesenchymal stromal cell (MSC) lines.
 
 # Raw data description
 
-The data are normalised protein abundances. Each row is a protein and there are three replicates for each subtype which are arranged in columns. Also in the file are columns for:
+There are two data file. [Y101_Y102_Y201_Y202_Y101-5.csv](%22data-raw/Y101_Y102_Y201_Y202_Y101-5.csv%22) and [comparison_p\_and_q.csv](%22data-raw/comparison_p_and_q.csv%22)
 
-* the protein accessions: the top hit is first, Human sequences are prefixed with `1::`, bovine with `2::`
-* the number of peptides used to identify the protein
-* the number of unique peptides used to identify the protein
-* a measure of confidence in that identification
-* the maximum fold change between the mean abundances of two cell lines (i.e., highest mean / lowest mean)
-* a p value for a comparison test between the highest mean and lowest mean
-* a q value (corrected p value)
-* a measure of the power of that test
-* the cell line with the highest mean
-* the cell line with the lowest mean
-* the protein mass
-* a description of the protein
-* a binary indicator variable for whether at least two peptides were detected for a protein.
+The data in Y101_Y102_Y201_Y202_Y101-5.csv are normalised protein abundances. Each row is a protein and there are three replicates for each subtype which are arranged in columns. Also in the file are columns for:
 
+-   the protein accessions: the top hit is first, Human sequences are prefixed with `1::`, bovine with `2::`
+-   the number of peptides used to identify the protein
+-   the number of unique peptides used to identify the protein
+-   a measure of confidence in that identification
+-   the maximum fold change between the mean abundances of two cell lines (i.e., highest mean / lowest mean)
+-   a p value for a comparison test between the highest mean and lowest mean
+-   a q value (corrected p value)
+-   a measure of the power of that test
+-   the cell line with the highest mean
+-   the cell line with the lowest mean
+-   the protein mass
+-   a description of the protein
+-   a binary indicator variable for whether at least two peptides were detected for a protein.
+
+The data in comparison_p\_and_q.csv give the p and q values for pairwise comparisons between cell line.
 
 ```{r data-import}
 # file
-filesol <- "../data-raw/Y101_Y102_Y201_Y202_Y101-5.csv"
+filesol <- "data-raw/Y101_Y102_Y201_Y202_Y101-5.csv"
 # Column names are spread over three rows but are primarily in the third row.
 # skip first two lines
 sol <- read_csv(filesol, skip = 2) %>% 
   janitor::clean_names()
 
-file <- "../data-raw/comparison_p_and_q.csv"
+file <- "data-raw/comparison_p_and_q.csv"
 p_q <- read_csv(file) %>% 
   janitor::clean_names()
 
 
 ```
 
+
+# Methods
+
+## Data preparation
 ```{r data-filter}
 # Remove irrelevant rows
 
@@ -87,7 +98,6 @@ p_q <- p_q %>%
   filter(x1pep == "x")
 
 ```
-
 
 ```{r add-useful-columns}
 # Extract important information 'hidden' in other columns to columns of their own
@@ -110,7 +120,6 @@ sol <- sol %>%
            str_replace("1::", ""))
 
 ```
-
 
 ```{r create-long-sol2}
 # Create a second dataframe, sol2 in which the protein abundances are in a single column
@@ -158,13 +167,9 @@ sol <- sol %>%
          fc_y201_y202 = log2(mean_y201/mean_y202)) # have p
 ```
 
-# Methods
-I used R [@R-core] with tidyverse packages [@R-tidyverse] to import and process the raw data.
-Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out.
+I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line-protein combination and log~2~ fold changes for pairwise comparisons between lines calculated.
 
-# Results
-There were `r num_prot` human protein identified from more than two peptides.
-
+## Visualisation
 ```{r pca-preparation}
 # PCA requires the proteins to be in columns and the samples to be in rows
 # Transpose the columns containing the abundance values
@@ -193,29 +198,97 @@ pca <- tsol %>%
   select(-lineage, -rep) %>%
   prcomp(scale. = TRUE)
 ```
+Principal Components analysis with protein abundances scaled to unit variance was conducted to visualise the distance between samples in fewer dimensions. The package **`GGally`** [@GGally] was used to produced pairwise scatter plots of the first six principal components.
 
-```{r}
+## Clustering and heatmaps
+```{r cluster-filter}
+# select genes where at least one comparison differs significantly at the q < 0.01 level
+row.names(sol) <- sol$genename
+sol_sigq_0.01 <- sol %>% 
+  filter(q_value <= 0.001) %>% 
+  select(starts_with("y")) 
+```
+
+
+```{r cluster-prep}
+# Matrix format
+sol_sigq_0.01 <- t(apply(sol_sigq_0.01, 1, z_score))
+mat <- sol_sigq_0.01
+mat <- as.matrix(mat)
+samples <- data.frame(line = rep(c("Y101",
+                                   "Y102",
+                                   "Y201",
+                                   "Y202",
+                                   "Y1015"),
+                                 each = 3))
+
+
+```
+
+
+Hierarchical clustering with the complete linkage method was performed for proteins and samples on the proteins that differed significantly (at the $q < 0.01$ level) between at least two lines. The abundances were z-score normalised for each protein before clustering. Z score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore) 
+
+\begin{equation}
+z = \frac{x_{ij} - \bar{x_{i}}}{sd_{i}}  
+(\#eq:zscore)
+\end{equation}
+
+
+
+and **`pheatmap`** [@pheatmap]  
+
+## Volcano plots
+```{r volcano-prep}
+sol <- merge(sol, p_q, by = "genename")
+```
+
+# Results
+There were `r num_prot` human protein identified from more than two peptides.
+
+
+## Principal Components analysis
+
+```{r pca-report}
 res <- summary(pca)[["importance"]]
 
 percent1 <- res["Cumulative Proportion","PC1"] * 100
 percent6 <- res["Cumulative Proportion","PC6"] * 100
 ```
 
-
-
 ```{r pca-vis}
 pca_labelled <- data.frame(pca$x, lineage = tsol$lineage)
 # a then to do a scatterplot
-ggplot(pca_labelled, aes(x = PC1, y = PC2, color = lineage)) +
-  geom_point()
+pca_labelled %>% 
+  select(lineage,
+         PC1:PC6) %>%
+  ggpairs(aes(color = lineage))
 ```
 
+## Clustering and heatmaps
 
-
-
-```{r volcano-prep}
-sol <- merge(sol, p_q, by = "genename")
+```{r}
+p <- heatmaply(mat, 
+               #   xlab = "", ylab = "", 
+               #   main = "",
+               scale = "column",
+             #  margins = c(40,40,40,20),
+               grid_color = "white",
+               grid_width = 0.00001,
+               titleX = FALSE,
+               hide_colorbar = FALSE,
+               branches_lwd = 0.1,
+             col_side_colors = samples,
+               k_col = 5,
+               label_names = c("Protein", "Sample", "Normalised Abundance"),
+               fontsize_row = 7, fontsize_col = 7,
+               labCol = colnames(mat),
+               labRow = rownames(mat),
+               heatmap_layers = theme(axis.line = element_blank())
+        )
 ```
+
+## Volcano plots
+
 
 ```{r}
 sol %>% 
@@ -227,17 +300,18 @@ sol %>%
   theme(legend.position = "none")
 ```
 
-
 ## Word count
+
 Word count calculated with ..
+
 ```{r wordcount}
-wc_main <- wordcountaddin:::text_stats("main.Rmd")[3] %>% str_extract("[0-9]+") %>% as.numeric()
-wc_readme <- wordcountaddin:::text_stats("../README.md")[3] %>% str_extract("[0-9]+") %>% as.numeric()
+wc_main <- wordcountaddin:::text_stats("report/main.Rmd")[3] %>% str_extract("[0-9]+") %>% as.numeric()
+wc_readme <- wordcountaddin:::text_stats("README.md")[3] %>% str_extract("[0-9]+") %>% as.numeric()
 
 ```
 
-This doc: `r wc_main`  
-The README: `r wc_readme`  
-Total: `r wc_main + wc_readme`  
+This doc: `r wc_main`\
+The README: `r wc_readme`\
+Total: `r wc_main + wc_readme`
 
 # References
