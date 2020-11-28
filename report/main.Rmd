@@ -2,8 +2,6 @@
 title: "Functional heterogeneity in Mesenchymal stromal cell (MSC) subtypes."
 author: "Emma Rand"
 output:
-  html_document:
-    df_print: paged
   bookdown::html_document2: default
   bookdown::pdf_document2: default
   bookdown::word_document2: default
@@ -30,7 +28,63 @@ source("functions/data_summary.R")
 source("functions/z_score.R")
 ```
 
-# Introduction
+```{r labels}
+lines = c("Y1015", 
+          "Y101",
+          "Y201",
+          "Y202",
+          "Y102")
+functionality = c("Super Osteogenic",
+                  "Osteogenic",
+                  "Multipotent",
+                  "Immunomodulatory",
+                  "Immunomodulatory")
+
+```
+
+```{r pallete}
+# from viridis::inferno
+# "Y1015" dark purple
+# "Y101" mid purple
+# "Y201" dark pink
+# "Y202" orange
+# "Y102" yellow
+line_colours <- viridis::inferno(7, 
+                                 begin = 0.15,
+                                 end = 0.85)[c(1, 2, 4, 6, 7)]
+```
+
+```{r banner-data}
+df <- data.frame(x = 1:5, 
+                 y = 1, 
+                 lines = lines,
+                 functionality = functionality)
+```
+
+
+```{r banner, fig.height=.5, out.width = "100%", fig.align='center'}
+
+df %>% 
+  ggplot(aes(x, y, fill = factor(x))) +
+  geom_col(width = 1) +
+  geom_label(aes(x = x, y = y*2/3, label = lines),
+             fill = "white",
+             size = 3,
+             label.size = 0,
+             label.padding = unit(0.3, "lines")) +
+  geom_label(aes(x = x, y = y*1/6, label = functionality),
+             fill = "white",
+             size = 2,
+             label.size = 0,
+             label.padding = unit(0.3, "lines")) +
+  scale_fill_manual(values = line_colours) +
+  theme_void() +
+  theme(legend.position = "none")
+  
+
+```
+
+# Introduction {#introduction}
 
 Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity [@Costa2020-ze; @Phinney2012-yw] and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies. The Genever Group has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes [@Stone2019-wr; @Kay2019-ec]. The phenotypes of these subtypes is as follows:
 
@@ -42,7 +96,9 @@ Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells
 
 The data are mass spectrometry data of the soluble protein fraction from five immortalised mesenchymal stromal cell (MSC) lines.
 
-# Raw data description
+# Methods {#methods}
+
+## Data description {#methods-data-description}
 
 There are two data file. [Y101_Y102_Y201_Y202_Y101-5.csv](%22data-raw/Y101_Y102_Y201_Y202_Y101-5.csv%22) and [comparison_p\_and_q.csv](%22data-raw/comparison_p_and_q.csv%22)
 
@@ -79,10 +135,8 @@ p_q <- read_csv(file) %>%
 
 ```
 
+## Data preparation {#methods-data-preparation}
 
-# Methods
-
-## Data preparation
 ```{r data-filter}
 # Remove irrelevant rows
 
@@ -169,10 +223,11 @@ sol <- sol %>%
 
 I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line-protein combination and log~2~ fold changes for pairwise comparisons between lines calculated.
 
-## Visualisation
+## Visualisation {#methods-visualisation}
+
 ```{r pca-preparation}
 # PCA requires the proteins to be in columns and the samples to be in rows
-# Transpose the columns containing the abundance values
+# Transpose the columns containing the abundance values for each sample
 tsol <- sol %>% select(starts_with("y")) %>%
   t() %>% 
   data.frame()
@@ -198,9 +253,11 @@ pca <- tsol %>%
   select(-lineage, -rep) %>%
   prcomp(scale. = TRUE)
 ```
+
 Principal Components analysis with protein abundances scaled to unit variance was conducted to visualise the distance between samples in fewer dimensions. The package **`GGally`** [@GGally] was used to produced pairwise scatter plots of the first six principal components.
 
-## Clustering and heatmaps
+## Clustering and heatmaps {#methods-clustering-and-heatmaps}
+
 ```{r cluster-filter}
 # select genes where at least one comparison differs significantly at the q < 0.01 level
 row.names(sol) <- sol$genename
@@ -209,44 +266,35 @@ sol_sigq_0.01 <- sol %>%
   select(starts_with("y")) 
 ```
 
-
 ```{r cluster-prep}
 # Matrix format
-sol_sigq_0.01 <- t(apply(sol_sigq_0.01, 1, z_score))
-mat <- sol_sigq_0.01
-mat <- as.matrix(mat)
-samples <- data.frame(line = rep(c("Y101",
-                                   "Y102",
-                                   "Y201",
-                                   "Y202",
-                                   "Y1015"),
-                                 each = 3))
-
-
+mat <- apply(sol_sigq_0.01, 1, z_score) %>% t()
+mat <- sol_sigq_0.01 %>% as.matrix()
 ```
 
+Hierarchical clustering with the complete linkage method was performed for proteins and samples on the proteins that differed significantly (at the $q < 0.01$ level) between at least two lines. The abundances were z-score normalised for each protein before clustering. Z score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore)
 
-Hierarchical clustering with the complete linkage method was performed for proteins and samples on the proteins that differed significantly (at the $q < 0.01$ level) between at least two lines. The abundances were z-score normalised for each protein before clustering. Z score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore) 
-
+```{=tex}
 \begin{equation}
-z = \frac{x_{ij} - \bar{x_{i}}}{sd_{i}}  
+z_{ij} = \frac{x_{ij} - \bar{x_{i}}}{sd_{i}}  
 (\#eq:zscore)
 \end{equation}
+```
+where: $z_{ij}$ is
 
+and **`pheatmap`** [@pheatmap]
 
+## Volcano plots {#methods-volcano-plots}
 
-and **`pheatmap`** [@pheatmap]  
-
-## Volcano plots
 ```{r volcano-prep}
 sol <- merge(sol, p_q, by = "genename")
 ```
 
-# Results
+# Results {#results}
+
 There were `r num_prot` human protein identified from more than two peptides.
 
-
-## Principal Components analysis
+## Principal Components analysis {#results-principal-components-analysis}
 
 ```{r pca-report}
 res <- summary(pca)[["importance"]]
@@ -256,39 +304,39 @@ percent6 <- res["Cumulative Proportion","PC6"] * 100
 ```
 
 ```{r pca-vis}
-pca_labelled <- data.frame(pca$x, lineage = tsol$lineage)
+pca_labelled <- data.frame(pca$x, lineage = factor(toupper(tsol$lineage), levels = lines))
 # a then to do a scatterplot
 pca_labelled %>% 
   select(lineage,
          PC1:PC6) %>%
-  ggpairs(aes(color = lineage))
+  ggpairs(aes(color = lineage, fill = lineage),
+          upper = NULL,
+          columns = 2:7) + 
+  scale_colour_manual(values = line_colours) +
+  scale_fill_manual(values = line_colours) +
+  theme_minimal()
+  
 ```
 
-## Clustering and heatmaps
+## Clustering and heatmaps  {#results-cluster-heat}
 
 ```{r}
+n_gen_clusters <- 3
+n_cell_clusters <- 5
 p <- heatmaply(mat, 
-               #   xlab = "", ylab = "", 
-               #   main = "",
-               scale = "column",
-             #  margins = c(40,40,40,20),
+               scale = "row",
                grid_color = "white",
-               grid_width = 0.00001,
-               titleX = FALSE,
-               hide_colorbar = FALSE,
-               branches_lwd = 0.1,
-             col_side_colors = samples,
-               k_col = 5,
+               hide_colorbar = TRUE,
+               k_col = n_cell_clusters,
+               k_row = n_gen_clusters,
                label_names = c("Protein", "Sample", "Normalised Abundance"),
-               fontsize_row = 7, fontsize_col = 7,
-               labCol = colnames(mat),
+               fontsize_row = 7, fontsize_col = 10,
+               labCol = toupper(colnames(mat)),
                labRow = rownames(mat),
-               heatmap_layers = theme(axis.line = element_blank())
-        )
+               heatmap_layers = theme(axis.line = element_blank()))
 ```
 
-## Volcano plots
-
+## Volcano plots {#results-volcano-plots}
 
 ```{r}
 sol %>% 
@@ -300,7 +348,7 @@ sol %>%
   theme(legend.position = "none")
 ```
 
-## Word count
+## Word count {#word-count}
 
 Word count calculated with ..
 
@@ -314,4 +362,4 @@ This doc: `r wc_main`\
 The README: `r wc_readme`\
 Total: `r wc_main + wc_readme`
 
-# References
+# References {#references}
