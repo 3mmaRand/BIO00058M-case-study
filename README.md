@@ -15,7 +15,3 @@ plotly
 heatmaply  
 kableExtra  
 
-```{r}
-sessioninfo::session_info()
-```
-
