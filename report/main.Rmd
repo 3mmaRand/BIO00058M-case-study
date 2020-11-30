@@ -17,6 +17,7 @@ knitr::opts_chunk$set(echo = FALSE,
 
 ```{r pkg}
 library(tidyverse)
+library(plotly)
 library(heatmaply)
 library(GGally)
 ```
@@ -24,8 +25,6 @@ library(GGally)
 ```{r functions}
 # data_summary calculates summary statistics (mean, sample size, standard deviation, standard error) for a numeric variable. Used to summarise the protein abundances for each cell line
 source("functions/data_summary.R")
-# z_score performs z score normalisation on a vector of values
-source("functions/z_score.R")
 ```
 
 ```{r labels}
@@ -55,28 +54,26 @@ line_colours <- viridis::inferno(7,
 ```
 
 ```{r banner-data}
-df <- data.frame(x = 1:5, 
+df <- data.frame(lines = factor(lines, levels = lines), 
                  y = 1, 
-                 lines = lines,
                  functionality = functionality)
 ```
-
 
 ```{r banner, fig.height=.5, out.width = "100%", fig.align='center'}
 
 df %>% 
-  ggplot(aes(x, y, fill = factor(x))) +
+  ggplot(aes(lines, y, fill = lines)) +
   geom_col(width = 1) +
-  geom_label(aes(x = x, y = y*2/3, label = lines),
-             fill = "white",
-             size = 3,
-             label.size = 0,
-             label.padding = unit(0.3, "lines")) +
-  geom_label(aes(x = x, y = y*1/6, label = functionality),
+  geom_label(aes(x = lines, y = y*2/3, label = lines),
              fill = "white",
              size = 2,
              label.size = 0,
-             label.padding = unit(0.3, "lines")) +
+             label.padding = unit(0.2, "lines")) +
+  geom_label(aes(x = lines, y = y*1/3, label = functionality),
+             fill = "white",
+             size = 2,
+             label.size = 0,
+             label.padding = unit(0.2, "lines")) +
   scale_fill_manual(values = line_colours) +
   theme_void() +
   theme(legend.position = "none")
@@ -86,7 +83,7 @@ df %>%
 
 # Introduction {#introduction}
 
-Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity [@Costa2020-ze; @Phinney2012-yw] and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies. The Genever Group has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes [@Stone2019-wr; @Kay2019-ec]. The phenotypes of these subtypes is as follows:
+Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells that originate from the mesoderm. They have the capacity for self-renewal and differentiation into osteoblasts, adipocytes and chondrocytes making them important for the development of cell-based therapies in regenerative medicine. However, populations of MSCs are heterogeneous with respect to their differentiation capacity [@Costa2020-ze; @Phinney2012-yw] and some exhibit immundomodulatory properties unhelpful for cell-based therapies. Understanding subtype heterogeneity is key for the development of efficacious therapies. [The Genever Group](https://www.geneverlab.info/) has developed a model of this heterogeneity using has a number of immortalised clonal MSC lines which comprises five subtypes [@Stone2019-wr; @Kay2019-ec]. The phenotypes of these subtypes is as follows:
 
 -   Y201 : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
 -   Y101 : osteogenic capacity
@@ -100,7 +97,7 @@ The data are mass spectrometry data of the soluble protein fraction from five im
 
 ## Data description {#methods-data-description}
 
-There are two data file. [Y101_Y102_Y201_Y202_Y101-5.csv](%22data-raw/Y101_Y102_Y201_Y202_Y101-5.csv%22) and [comparison_p\_and_q.csv](%22data-raw/comparison_p_and_q.csv%22)
+There are two data files: [Y101_Y102_Y201_Y202_Y101-5.csv](data-raw/Y101_Y102_Y201_Y202_Y101-5.csv) and [comparison_p\_and_q.csv](data-raw/comparison_p_and_q.csv)
 
 The data in Y101_Y102_Y201_Y202_Y101-5.csv are normalised protein abundances. Each row is a protein and there are three replicates for each subtype which are arranged in columns. Also in the file are columns for:
 
@@ -109,8 +106,8 @@ The data in Y101_Y102_Y201_Y202_Y101-5.csv are normalised protein abundances. Ea
 -   the number of unique peptides used to identify the protein
 -   a measure of confidence in that identification
 -   the maximum fold change between the mean abundances of two cell lines (i.e., highest mean / lowest mean)
--   a p value for a comparison test between the highest mean and lowest mean
--   a q value (corrected p value)
+-   a $p$ value for a comparison test between the highest mean and lowest mean
+-   $q$ the false discovery rate, a $p$ value corrected by the Benjamini--Hochberg procedure [@Benjamini1995-yj].
 -   a measure of the power of that test
 -   the cell line with the highest mean
 -   the cell line with the lowest mean
@@ -131,8 +128,6 @@ sol <- read_csv(filesol, skip = 2) %>%
 file <- "data-raw/comparison_p_and_q.csv"
 p_q <- read_csv(file) %>% 
   janitor::clean_names()
-
-
 ```
 
 ## Data preparation {#methods-data-preparation}
@@ -190,14 +185,21 @@ sol2 <- sol %>% pivot_longer(names_to = "lineage_rep",
 ```
 
 ```{r summary-sol}
-# Add columns for means for each cell line and genes
-# add a dataframe for the mean, se, sd, and n abundance for each cell line
+# add a dataframe for the mean, se, sd, and n abundance for each cell line protein combination
 sol_summary <- data_summary(sol2, 
                             measure = abundance, 
                             group1 = line,
                             group2 = protid)
+# add a dataframe for the mean, se, sd, and n abundance for each cell line 
+sol_summary_line <- data_summary(sol2, 
+                            measure = abundance, 
+                            group1 = line)
+sol_summary_line$line <- factor(toupper(sol_summary_line$line), levels = lines)
+```
 
-# reformat so these can be added as column to the data set
+```{r augment-sol}
+# add the protein-line summary information to the main dataset
+# requires protein-line summary info to be spread
 sol_summary <- sol_summary %>% 
   pivot_wider(names_from = line,
               values_from = c(mean, n, sd, se))
@@ -221,9 +223,22 @@ sol <- sol %>%
          fc_y201_y202 = log2(mean_y201/mean_y202)) # have p
 ```
 
-I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line-protein combination and log~2~ fold changes for pairwise comparisons between lines calculated.
+I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line and for each line-protein combination. The log fold change between cell lines for each protein was calculated. See Equation \@ref(eq:logfc). 
 
-## Visualisation {#methods-visualisation}
+
+\begin{equation}
+FC_{jj'} = log_{2}\left(\frac{mean_{j}}{mean_{j'}}\right)
+(\#eq:logfc)
+\end{equation}
+
+where: 
+
+* $mean_{j}$ is the mean protein abundance for a given protein in cell line $j$  
+* $mean_{j'}$ is the mean protein abundance for a given protein in another cell line $j'$  
+* such that $FC_{jj'}$ is the $log_{2}$ fold change between line $j$ and line $j'$ for a given gene.
+
+
+## Visualisation with Principal Components Analysis {#methods-visualisation}
 
 ```{r pca-preparation}
 # PCA requires the proteins to be in columns and the samples to be in rows
@@ -254,7 +269,7 @@ pca <- tsol %>%
   prcomp(scale. = TRUE)
 ```
 
-Principal Components analysis with protein abundances scaled to unit variance was conducted to visualise the distance between samples in fewer dimensions. The package **`GGally`** [@GGally] was used to produced pairwise scatter plots of the first six principal components.
+Principal Components Analysis was used for dimensionality-reduction to allow visualisation the distance between samples. It was conducted on protein abundances scaled to unit variance to prevent highly abundant proteins dominating the analysis. The package **`GGally`** [@GGally] was used to produced pairwise scatter plots of the first six principal components.
 
 ## Clustering and heatmaps {#methods-clustering-and-heatmaps}
 
@@ -268,21 +283,23 @@ sol_sigq_0.01 <- sol %>%
 
 ```{r cluster-prep}
 # Matrix format
-mat <- apply(sol_sigq_0.01, 1, z_score) %>% t()
 mat <- sol_sigq_0.01 %>% as.matrix()
 ```
 
-Hierarchical clustering with the complete linkage method was performed for proteins and samples on the proteins that differed significantly (at the $q < 0.01$ level) between at least two lines. The abundances were z-score normalised for each protein before clustering. Z score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore)
+Hierarchical clustering was conducted and heatmaps produced with the package **`heatmaply`** [@heatmaply] with interactivity provided by **`plotly`** [@plotly]. Hierarchical clustering used the complete linkage method and was performed for both proteins and samples on the proteins that differed significantly (at the $q < 0.01$ level) between at least two lines. The abundances were "$z$-score normalised" for each protein before clustering. $Z$-score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore).
 
-```{=tex}
+
 \begin{equation}
-z_{ij} = \frac{x_{ij} - \bar{x_{i}}}{sd_{i}}  
+z_{ijk} = \frac{x_{ijk} - \bar{x_{ij}}}{sd_{ij}}  
 (\#eq:zscore)
 \end{equation}
-```
-where: $z_{ij}$ is
 
-and **`pheatmap`** [@pheatmap]
+where:  
+
+* $x_{ijk}$ is the abundance for protein $i$, cell line $j$ and replicate $k$  
+* $\bar{x_{ij}}$ is the mean abundance for protein $i$ and cell line $j$ across replicates  
+* $sd_{ij}$ is the standard deviation on the abundance for protein $i$ and cell line $j$ across replicates  
+* such that $z_{ijk}$ is the $z$-score normalised abundance for protein $i$, cell line $j$ and replicate $k$
 
 ## Volcano plots {#methods-volcano-plots}
 
@@ -292,7 +309,51 @@ sol <- merge(sol, p_q, by = "genename")
 
 # Results {#results}
 
-There were `r num_prot` human protein identified from more than two peptides.
+There were `r num_prot` human protein identified from more than two peptides and the total soluble protein content of each cell line was broadly similar. See figure \@ref(fig:line-abund-fig).
+
+```{r line-abund-fig, fig.height=4, fig.width=4, fig.cap="(ref:line-abund-fig)"}
+# ..
+sol_summary_line %>% 
+  ggplot() +
+  geom_col(aes(x = line, y = mean, fill = line)) +
+  geom_errorbar(aes(x = line,
+                    ymin = mean - se,
+                    ymax = mean + se),
+                width = .5) +
+  scale_x_discrete(labels = lines,
+                   name = "") +
+  scale_fill_manual(values = line_colours) +
+  scale_y_continuous(name = "Protein Abundance (units)",
+                     expand = c(0, 0)) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+```
+
+<!-- figure legend -->
+
+(ref:line-abund-fig) Mean soluble protein content for each cell line. Error bars are $\bar{x} \pm 1 s.e.$
+
+<!-- end of fig legend -->
+
+
+```{r}
+venndf <- data.frame(gene = sol$genename,
+                     Y101 = sol$mean_y101 > 0,
+                     Y1015 = sol$mean_y1015 > 0,
+                     Y102 = sol$mean_y102  > 0,
+                     Y201 = sol$mean_y201 > 0,
+                       Y202 = sol$mean_y202 > 0)
+
+counts <- limma::vennCounts(venndf[-1])
+
+limma::vennDiagram(counts,
+                   circle.col = line_colours[c(1,5,3,4,2)],
+                   lwd = 2,
+                   mar = rep(0.5,4))
+```
+
+
 
 ## Principal Components analysis {#results-principal-components-analysis}
 
@@ -304,7 +365,9 @@ percent6 <- res["Cumulative Proportion","PC6"] * 100
 ```
 
 ```{r pca-vis}
-pca_labelled <- data.frame(pca$x, lineage = factor(toupper(tsol$lineage), levels = lines))
+pca_labelled <- data.frame(pca$x, 
+                           lineage = factor(toupper(tsol$lineage),
+                                            levels = lines))
 # a then to do a scatterplot
 pca_labelled %>% 
   select(lineage,
@@ -318,7 +381,7 @@ pca_labelled %>%
   
 ```
 
-## Clustering and heatmaps  {#results-cluster-heat}
+## Clustering and heatmaps {#results-cluster-heat}
 
 ```{r}
 n_gen_clusters <- 3
@@ -348,18 +411,31 @@ sol %>%
   theme(legend.position = "none")
 ```
 
+```{r}
+file <- "sessioninfo.md"
+writeLines(capture.output(sessionInfo()), file)
+```
+
 ## Word count {#word-count}
 
-Word count calculated with ..
+Word count calculated with wordcountaddin [@wordcountaddin]. The session information was written into a separate file rather than to the README this has been added to the wordcount.
 
 ```{r wordcount}
-wc_main <- wordcountaddin:::text_stats("report/main.Rmd")[3] %>% str_extract("[0-9]+") %>% as.numeric()
-wc_readme <- wordcountaddin:::text_stats("README.md")[3] %>% str_extract("[0-9]+") %>% as.numeric()
+wc_main <- wordcountaddin:::text_stats("report/main.Rmd")[3] %>%
+  str_extract("[0-9]+") %>% 
+  as.numeric()
+wc_readme <- wordcountaddin:::text_stats("README.md")[3] %>%
+  str_extract("[0-9]+") %>%
+  as.numeric()
+wc_session <- wordcountaddin:::text_stats("sessioninfo.md")[3] %>%
+  str_extract("[0-9]+") %>%
+  as.numeric()
 
 ```
 
-This doc: `r wc_main`\
-The README: `r wc_readme`\
-Total: `r wc_main + wc_readme`
+This document: `r wc_main`\
+README: `r wc_readme`\
+Session info: `r wc_session`\
+**Total: `r wc_main + wc_readme + wc_session`**
 
 # References {#references}
