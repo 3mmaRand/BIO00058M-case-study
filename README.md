@@ -1,5 +1,8 @@
 # BIO00058M-case-study
 
+[Report output](https://3mmarand.github.io/BIO00058M-case-study/main.html)
+
+
 ## Description
 
 ## Technical descirptions

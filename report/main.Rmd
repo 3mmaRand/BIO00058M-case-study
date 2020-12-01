@@ -16,23 +16,26 @@ knitr::opts_chunk$set(echo = FALSE,
 ```
 
 ```{r pkg}
-library(tidyverse)
-library(plotly)
-library(heatmaply)
-library(GGally)
+library(tidyverse)    # import, tidying, summary, plotting
+#library(plotly)       # import, tidying, summary, plotting
+library(heatmaply)    # interactive heatmap
+library(GGally)    # PCA visualisation
+library(VennDiagram)    # protein set vemm
 ```
 
 ```{r functions}
 # data_summary calculates summary statistics (mean, sample size, standard deviation, standard error) for a numeric variable. Used to summarise the protein abundances for each cell line
-source("functions/data_summary.R")
+source("../functions/data_summary.R")
 ```
 
 ```{r labels}
+# cell line name for figures and ordering of factor levels
 lines = c("Y1015", 
           "Y101",
           "Y201",
           "Y202",
           "Y102")
+# broad functionality of each cell line, order to match 'lines'
 functionality = c("Super Osteogenic",
                   "Osteogenic",
                   "Multipotent",
@@ -42,7 +45,8 @@ functionality = c("Super Osteogenic",
 ```
 
 ```{r pallete}
-# from viridis::inferno
+# palette for cell lines from viridis::inferno
+# order to match 'lines' and colour proximity reflects functionality proximity
 # "Y1015" dark purple
 # "Y101" mid purple
 # "Y201" dark pink
@@ -54,13 +58,14 @@ line_colours <- viridis::inferno(7,
 ```
 
 ```{r banner-data}
+# data for banner plot
 df <- data.frame(lines = factor(lines, levels = lines), 
                  y = 1, 
                  functionality = functionality)
 ```
 
 ```{r banner, fig.height=.5, out.width = "100%", fig.align='center'}
-
+# banner plot, acts as global key
 df %>% 
   ggplot(aes(lines, y, fill = lines)) +
   geom_col(width = 1) +
@@ -77,8 +82,6 @@ df %>%
   scale_fill_manual(values = line_colours) +
   theme_void() +
   theme(legend.position = "none")
-  
-
 ```
 
 # Introduction {#introduction}
@@ -87,9 +90,10 @@ Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells
 
 -   Y201 : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
 -   Y101 : osteogenic capacity
+-   Y101.5 : enhanced osteogenic capacity
 -   Y202 : immundomodulatory capacity
 -   Y102 : immundomodulatory capacity
--   Y101.5 : enhanced osteogenic capacity
+
 
 The data are mass spectrometry data of the soluble protein fraction from five immortalised mesenchymal stromal cell (MSC) lines.
 
@@ -97,7 +101,7 @@ The data are mass spectrometry data of the soluble protein fraction from five im
 
 ## Data description {#methods-data-description}
 
-There are two data files: [Y101_Y102_Y201_Y202_Y101-5.csv](data-raw/Y101_Y102_Y201_Y202_Y101-5.csv) and [comparison_p\_and_q.csv](data-raw/comparison_p_and_q.csv)
+There are two data files: [Y101_Y102_Y201_Y202_Y101-5.csv](../data-raw/Y101_Y102_Y201_Y202_Y101-5.csv) and [comparison_p\_and_q.csv](../data-raw/comparison_p_and_q.csv)
 
 The data in Y101_Y102_Y201_Y202_Y101-5.csv are normalised protein abundances. Each row is a protein and there are three replicates for each subtype which are arranged in columns. Also in the file are columns for:
 
@@ -119,13 +123,13 @@ The data in comparison_p\_and_q.csv give the p and q values for pairwise compari
 
 ```{r data-import}
 # file
-filesol <- "data-raw/Y101_Y102_Y201_Y202_Y101-5.csv"
+filesol <- "../data-raw/Y101_Y102_Y201_Y202_Y101-5.csv"
 # Column names are spread over three rows but are primarily in the third row.
 # skip first two lines
 sol <- read_csv(filesol, skip = 2) %>% 
   janitor::clean_names()
 
-file <- "data-raw/comparison_p_and_q.csv"
+file <- "../data-raw/comparison_p_and_q.csv"
 p_q <- read_csv(file) %>% 
   janitor::clean_names()
 ```
@@ -197,7 +201,7 @@ sol_summary_line <- data_summary(sol2,
 sol_summary_line$line <- factor(toupper(sol_summary_line$line), levels = lines)
 ```
 
-```{r augment-sol}
+```{r augment-sol-summary}
 # add the protein-line summary information to the main dataset
 # requires protein-line summary info to be spread
 sol_summary <- sol_summary %>% 
@@ -207,7 +211,7 @@ sol_summary <- sol_summary %>%
 sol <- merge(sol, sol_summary, by = "protid")
 ```
 
-```{r}
+```{r augment-sol-logfc}
 # calculate the log fold changes for each of the comparisons
 # we have p values for. This is all the pairwaise comparisions
 # except that y1015 is commpared only to y101, no others
@@ -223,7 +227,17 @@ sol <- sol %>%
          fc_y201_y202 = log2(mean_y201/mean_y202)) # have p
 ```
 
-I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line and for each line-protein combination. The log fold change between cell lines for each protein was calculated. See Equation \@ref(eq:logfc). 
+
+```{r protein-sets}
+# a protein is present in a cell line if the mean abundance is greater than zero
+protein_set <- list(Y1015 = sol$genename[sol$mean_y1015 > 0],
+                    Y101 = sol$genename[sol$mean_y101 > 0],
+                    Y201 = sol$genename[sol$mean_y201 > 0],
+                    Y202 = sol$genename[sol$mean_y202 > 0],
+                    Y102 = sol$genename[sol$mean_y102  > 0])
+```
+
+I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line and for each line-protein combination and log fold change between cell lines for each protein were calculated. See Equation \@ref(eq:logfc). Protein sets were visualised with the **`VennDiagram`** package [@VennDiagram].
 
 
 \begin{equation}
@@ -311,6 +325,43 @@ sol <- merge(sol, p_q, by = "genename")
 
 There were `r num_prot` human protein identified from more than two peptides and the total soluble protein content of each cell line was broadly similar. See figure \@ref(fig:line-abund-fig).
 
+
+```{r protein-venn-write}
+# suppresses the writing of the log file
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
+venn.diagram(protein_set,
+             filename = "figures/venn.png",
+             imagetype = "png" ,
+             height = 1000,
+             width = 1000,
+             units = "px",
+             cat.col = line_colours,
+             fill = line_colours,
+             col = line_colours,
+             cat.default.pos = "outer",
+             lwd = 1,
+             cex = 0.5,
+             cat.cex = 0.6,
+             cat.fontfamily = "sans",
+             fontfamily = "sans",
+             margin = 0.1,
+             cat.dist = 0.25)
+```
+
+```{r protein-venn-fig, out.width="50%", fig.cap='(ref:protein-venn-fig)'}
+file <- "figures/venn.png"
+knitr::include_graphics(file)
+
+```
+
+<!-- figure legend -->
+
+(ref:protein-venn-fig) Protein set shared by cells lines. Visualised with package **`VennDiagram`** [@VennDiagram]
+
+<!-- end of fig legend -->
+
+
+
 ```{r line-abund-fig, fig.height=4, fig.width=4, fig.cap="(ref:line-abund-fig)"}
 # ..
 sol_summary_line %>% 
@@ -335,24 +386,6 @@ sol_summary_line %>%
 (ref:line-abund-fig) Mean soluble protein content for each cell line. Error bars are $\bar{x} \pm 1 s.e.$
 
 <!-- end of fig legend -->
-
-
-```{r}
-venndf <- data.frame(gene = sol$genename,
-                     Y101 = sol$mean_y101 > 0,
-                     Y1015 = sol$mean_y1015 > 0,
-                     Y102 = sol$mean_y102  > 0,
-                     Y201 = sol$mean_y201 > 0,
-                       Y202 = sol$mean_y202 > 0)
-
-counts <- limma::vennCounts(venndf[-1])
-
-limma::vennDiagram(counts,
-                   circle.col = line_colours[c(1,5,3,4,2)],
-                   lwd = 2,
-                   mar = rep(0.5,4))
-```
-
 
 
 ## Principal Components analysis {#results-principal-components-analysis}
@@ -412,7 +445,7 @@ sol %>%
 ```
 
 ```{r}
-file <- "sessioninfo.md"
+file <- "../sessioninfo.md"
 writeLines(capture.output(sessionInfo()), file)
 ```
 
@@ -421,13 +454,13 @@ writeLines(capture.output(sessionInfo()), file)
 Word count calculated with wordcountaddin [@wordcountaddin]. The session information was written into a separate file rather than to the README this has been added to the wordcount.
 
 ```{r wordcount}
-wc_main <- wordcountaddin:::text_stats("report/main.Rmd")[3] %>%
+wc_main <- wordcountaddin:::text_stats("main.Rmd")[3] %>%
   str_extract("[0-9]+") %>% 
   as.numeric()
-wc_readme <- wordcountaddin:::text_stats("README.md")[3] %>%
+wc_readme <- wordcountaddin:::text_stats("../README.md")[3] %>%
   str_extract("[0-9]+") %>%
   as.numeric()
-wc_session <- wordcountaddin:::text_stats("sessioninfo.md")[3] %>%
+wc_session <- wordcountaddin:::text_stats("../sessioninfo.md")[3] %>%
   str_extract("[0-9]+") %>%
   as.numeric()
 
