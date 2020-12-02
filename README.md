@@ -5,11 +5,14 @@
 
 ## Description
 
-## Technical descirptions
+## Technical description
 
 R version 4.0.2 (2020-06-22)
 
 ### Packages
+-   patchwork_1.1.0
+-   VennDiagram_1.6.20
+-   futile.logger_1.4.3
 -   GGally_2.0.0 
 -   heatmaply_1.1.1 
 -   viridis_0.5.1 
@@ -25,4 +28,7 @@ R version 4.0.2 (2020-06-22)
 -   ggplot2_3.3.2
 -   tidyverse_1.3.0
 
-The output of `sessionInfo()` can be found in [Session Information](sessioninfo.txt)
+The output of `sessionInfo()` can be found in [Session Information](sessioninfo.md)
+
+### Notes
+Knit directory of report/main.Rmd is document directory.
