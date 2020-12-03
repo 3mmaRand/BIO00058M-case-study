@@ -92,8 +92,8 @@ Mesenchymal stromal cells (MSCs) are a subset non-hematopoietic adult stem cells
 -   Y201 : the MSC stereotype which differentiate into osteoblasts, adipocytes and chondrocytes
 -   Y101 : osteogenic capacity
 -   Y101.5 : enhanced osteogenic capacity
--   Y202 : immundomodulatory capacity
--   Y102 : immundomodulatory capacity
+-   Y202 : immunomodulatory capacity
+-   Y102 : immunomodulatory capacity
 
 
 The data are mass spectrometry data of the soluble protein fraction from five immortalised mesenchymal stromal cell (MSC) lines.
@@ -111,7 +111,7 @@ The data in Y101_Y102_Y201_Y202_Y101-5.csv are normalised protein abundances. Ea
 -   the number of unique peptides used to identify the protein
 -   a measure of confidence in that identification
 -   the maximum fold change between the mean abundances of two cell lines (i.e., highest mean / lowest mean)
--   a $p$ value for a comparison test between the highest mean and lowest mean
+-   a $p$ value for a one-way ANOVA for the effect of cell line
 -   $q$ the false discovery rate, a $p$ value corrected by the Benjamini--Hochberg procedure [@Benjamini1995-yj].
 -   a measure of the power of that test
 -   the cell line with the highest mean
@@ -301,8 +301,9 @@ Principal Components Analysis was used for dimensionality-reduction to allow vis
 ## Clustering and heatmaps {#methods-clustering-and-heatmaps}
 
 ```{r cluster-filter}
-# select genes where at least one comparison differs significantly at the q < 0.001 level
 row.names(sol) <- sol$genename
+
+# select genes where at least one comparison differs significantly at the q < 0.001 level
 sol_sigq_0.01 <- sol %>% 
   filter(q_value <= 0.01) %>% 
   select(starts_with("y")) 
@@ -310,8 +311,17 @@ sol_sigq_0.01 <- sol %>%
 # number of significant q < 0.01 values
 n_sigq_0.01 <- nrow(sol_sigq_0.01)
 
-# number of significant q < 0.05 values
-n_sigq_0.05 <- length(sol$q_value[sol$q_value < 0.05])
+# select genes where at least one comparison differs significantly at the q < 0.001 level
+sol_sigq_0.05 <- sol %>% 
+  filter(q_value <= 0.05) %>% 
+  select(starts_with("y")) 
+
+# number of significant q < 0.05 values but not less than 0.01
+n_sigq_0.05 <- nrow(sol_sigq_0.05) 
+n_sigq_0.05_0.01 <- n_sigq_0.05 - n_sigq_0.01
+# number of significant p < 0.01 and <0.05
+n_sigp_0.01 <- length(sol$anova_p[sol$anova_p < 0.01])
+n_sigp_0.05 <- length(sol$anova_p[sol$anova_p < 0.05])
 ```
 
 ```{r cluster-prep}
@@ -319,7 +329,8 @@ n_sigq_0.05 <- length(sol$q_value[sol$q_value < 0.05])
 mat <- sol_sigq_0.01 %>% as.matrix()
 ```
 
-Hierarchical clustering was conducted and heatmaps produced with the package **`heatmaply`** [@heatmaply] with interactivity provided by **`plotly`** [@plotly]. Hierarchical clustering used the complete linkage method and was performed for both proteins and samples on the proteins that differed significantly between at least two lines. Significance was determined at the $q < 0.01$ level where $q$ is a probability corrected for multiple comparisons by the Benjamini–Hochberg procedure [@Benjamini1995-yj]. The abundances were "$z$-score normalised" for each protein before clustering and heatmapping. $Z$-score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore).
+Hierarchical clustering was conducted and heatmaps produced with the package **`heatmaply`** [@heatmaply] with interactivity provided by **`plotly`** [@plotly]. Hierarchical clustering used the complete linkage method and was performed for both proteins and samples on the proteins that differed significantly between at least two lines. Significance was determined at the $q < 0.01$ level where $q$ is the False Discovery Rate (FDR) adjusted $p$-value. FDR is a method of correcting for multiple comparisons by the Benjamini–Hochberg procedure [@Benjamini1995-yj]. 
+The abundances were "$z$-score normalised" for each protein before clustering and heatmapping. $Z$-score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore).
 
 
 \begin{equation}
@@ -420,7 +431,8 @@ percent1 <- round(res["Cumulative Proportion","PC1"] * 100, 1)
 percent6 <- round(res["Cumulative Proportion","PC6"] * 100, 1)  
 ```
 
-The first Principal Component captured `r percent1`% of the variation in soluble protein expression between samples and the first six captured `r percent6`%. The distributions of scores on PC1 for each cell lineage show good separation between Y1015 and the other cell lines. The two immunodulatory lines, Y102 and Y202 are the least easy to separate on a single component. Pairwise scatter plots of PC1 to PC6 show greater, but still imperfect, separation of lines. See figure \@ref(fig:pca-vis-fig).
+The first Principal Component captured `r percent1`% of the variation in soluble protein expression between samples and the first six captured `r percent6`%. The distributions of scores on PC1 for each cell lineage show good separation between Y1015 and the other cell lines. The two immunomodulatory lines, Y102 and Y202 are the least easy to separate on a single component. Pairwise scatter plots of PC1 to PC6 show greater, but still imperfect, separation of lines. See figure \@ref(fig:pca-vis-fig).
+
 ```{r pca-vis-prep1}
 # the pairwise plots of PC with a legend are produced by adding an inset of the lgend to a figure of the pairwise plots. Since ggpairs ouputs a ggmatrix object rather than a ggplot object, this is save to file then placed as an image on a plot to which the inset is added
 
@@ -491,13 +503,17 @@ p1 + inset_element(p2, 0.70, 0.68, 0.9, 0.9)
 
 ## Clustering and heatmaps {#results-cluster-heat}
 
-The distribution of q values  and andhe abundance of `r n_sigq_0.01` proteins differed significantly between at least two cell lines. There were: `r row.names(sol_sigq_0.01)`
+There were `r n_sigp_0.05` proteins with $p < 0.05$  and `r n_sigp_0.01` proteins with $p < 0.01$ but `r num_prot` tests implies `r num_prot * 0.05` and `r num_prot * 0.01` respectively are false positives. The FDR adjusted $p$-value (or $q$-value) of 0.01 implies that 1% of significant tests will result in false positives. The abundance of `r n_sigq_0.05` proteins differed significantly between at least two cell lines at the $q < 0.05$ level and between `r n_sigq_0.01` proteins at the $q < 0.01$ level. This implies only `r n_sigq_0.05 * 0.05` and `r n_sigq_0.01 * 0.01` false positives.
 
-```{r q-fig, fig.width=6, fig.height=4,fig.cap="(ref:q-fig)"}
-lab0.05 <- bquote(italic(n)~"="~.(n_sigq_0.05))
+The distribution of $q$-values was right skewed (see Figure \@ref(fig:q-fig)) with a mean of `r round(mean(sol$q_value), 4)` and a median of `r round(median(sol$q_value), 4)`. This what we would expect to see.
+
+
+```{r q-fig, fig.width=8, fig.height=4,fig.cap="(ref:q-fig)"}
+# labelling for the figure giving the number of proteins with abundances significantly different between at least two lines at a particular significance level.
+lab0.05 <- bquote(italic(n)~"="~.(n_sigq_0.05_0.01))
 lab0.01 <- bquote(italic(n)~"="~.(n_sigq_0.01))
 
-
+# distribution of q values
 sol %>% ggplot(aes(q_value)) +
   geom_density() + 
   geom_vline(xintercept = 0.05) + 
@@ -507,7 +523,7 @@ sol %>% ggplot(aes(q_value)) +
   scale_y_continuous(expand = c(0, 0),
                      name =  expression(italic(q) * "-value (FDR corrected" ~ italic(p) * "-value)") ) +
   annotate("text", x = 0.15, y = 2, label = "Not significant") +
-  annotate("text", x = 0.03, y = 2.4, label = expression(italic(p)~"< 0.05")) +
+  annotate("text", x = 0.03, y = 2.4, label = expression("0.01<"~italic(p)~"< 0.05")) +
   annotate("text", x = 0.1, y = 6.4, label = expression(italic(p)~"< 0.01")) +
   annotate("text", x = 0.03, y = 2, label = lab0.05) +
   annotate("text", x = 0.1, y = 6, label = lab0.01) +
@@ -517,15 +533,19 @@ sol %>% ggplot(aes(q_value)) +
 
 <!-- figure legend -->
 
-(ref:q-fig) q figure and some info about it
+(ref:q-fig) Distribution of $q$-values ($p$-values corrected for multiple comparisons by the Benjamini–Hochberg procedure [@Benjamini1995-yj]).  
 
 <!-- end of fig legend -->
 
 ```{r}
-n_gen_clusters <- 5
+n_gen_clusters <- 3
 n_cell_clusters <- 5
-
 ```
+
+*to be completed*
+Cell line replicates clustered by protein expression. These clustered corresponded 
+The two immunomodulatory (see Figure \@ref(fig:heatmap-fig)) foorm one clus
+
 
 ```{r heatmap-fig, fig.width=8, fig.height=14,fig.cap="(ref:heatmap-fig)"}
 heatmaply(mat, 
