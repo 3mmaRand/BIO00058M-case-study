@@ -542,7 +542,8 @@ n_gen_clusters <- 3
 n_cell_clusters <- 5
 ```
 
-*to be completed*
+# *to be completed*
+
 Cell line replicates clustered by protein expression. These clustered corresponded 
 The two immunomodulatory (see Figure \@ref(fig:heatmap-fig)) foorm one clus
 
