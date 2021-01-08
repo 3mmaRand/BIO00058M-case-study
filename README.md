@@ -7,8 +7,6 @@
  * to be completed*
 
 ## Technical description
- * to be completed*
-
 R version 4.0.2 (2020-06-22)
 
 ### Packages
