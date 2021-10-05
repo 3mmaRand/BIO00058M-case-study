@@ -5,7 +5,7 @@ output:
   bookdown::html_document2: default
   bookdown::pdf_document2: default
   bookdown::word_document2: default
-bibliography: refs.bib
+bibliography: ["packages.bib","refs.bib"]
 ---
 
 ```{r setup, include=FALSE}
@@ -16,32 +16,30 @@ knitr::opts_chunk$set(echo = FALSE,
 ```
 
 ```{r pkg}
-library(tidyverse)      # import, tidying, summary, plotting
-#library(plotly)        # import, tidying, summary, plotting
-library(heatmaply)      # interactive heatmap
-library(GGally)         # PCA visualisation
-library(VennDiagram)    # protein set venn
-library(patchwork)      # arranging ggplots
+source("../R/00-pkg.R", local = knitr::knit_global())
 ```
 
 ```{r functions}
 # data_summary calculates summary statistics (mean, sample size, standard deviation, standard error) for a numeric variable. Used to summarise the protein abundances for each cell line
-source("../functions/data_summary.R")
+source("../R/data_summary.R", local = knitr::knit_global())
 ```
 
 ```{r labels}
-# cell line name for figures and ordering of factor levels
-lineage = c("Y1015", 
-          "Y101",
-          "Y201",
-          "Y202",
-          "Y102")
-# broad functionality of each cell line, order to match 'lineage'
-functionality = c("Super Osteogenic",
-                  "Osteogenic",
-                  "Multipotent",
-                  "Immunomodulatory",
-                  "Immunomodulatory")
+# labels for the five cell lines that can be used in figures and # to order of factor levels
+# "Y1015"
+# "Y101"
+# "Y201"
+# "Y202"
+# "Y102"
+# 
+# Functionality label for each cell line; the order match cell
+# line label'
+# "Super Osteogenic"
+# "Osteogenic"
+# "Multipotent"
+# "Immunomodulatory"
+# "Immunomodulatory"
+source("../R/01-labels.R", local = knitr::knit_global())
 
 ```
 
@@ -53,36 +51,12 @@ functionality = c("Super Osteogenic",
 # "Y201" dark pink
 # "Y202" orange
 # "Y102" yellow
-line_colours <- viridis::inferno(7, 
-                                 begin = 0.15,
-                                 end = 0.85)[c(1, 2, 4, 6, 7)]
+source("../R/02-palette.R", local = knitr::knit_global())
 ```
 
-```{r banner-data}
-# data for banner plot
-df <- data.frame(lineage = factor(lineage, levels = lineage), 
-                 y = 1, 
-                 functionality = functionality)
-```
 
 ```{r banner, fig.height=.5, out.width = "100%", fig.align='center'}
-# banner plot, acts as global key
-df %>% 
-  ggplot(aes(lineage, y, fill = lineage)) +
-  geom_col(width = 1) +
-  geom_label(aes(x = lineage, y = y*2/3, label = lineage),
-             fill = "white",
-             size = 2,
-             label.size = 0,
-             label.padding = unit(0.2, "lines")) +
-  geom_label(aes(x = lineage, y = y*1/3, label = functionality),
-             fill = "white",
-             size = 2,
-             label.size = 0,
-             label.padding = unit(0.2, "lines")) +
-  scale_fill_manual(values = line_colours) +
-  theme_void() +
-  theme(legend.position = "none")
+source("../R/03-banner.R", local = knitr::knit_global())
 ```
 
 # Introduction {#introduction}
@@ -250,7 +224,7 @@ absent_y201 <- setdiff(protein_set[["Y101"]],protein_set[["Y201"]])
 absent_y202 <- setdiff(protein_set[["Y101"]],protein_set[["Y202"]])
 ```
 
-I used R [@R-core] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line and for each line-protein combination and log fold change between cell lines for each protein were calculated. See Equation \@ref(eq:logfc). Protein sets were visualised with the **`VennDiagram`** package [@VennDiagram].
+I used R [@R-base] with **`tidyverse`** packages [@R-tidyverse] to import and process the raw data. Bovine serum proteins from the medium on which the cells were grown and those for which fewer than two peptides were detected were filtered out. Abundances were summarised for each line and for each line-protein combination and log fold change between cell lines for each protein were calculated. See Equation \@ref(eq:logfc). Protein sets were visualised with the **`VennDiagram`** package [@R-VennDiagram].
 
 
 \begin{equation}
@@ -296,7 +270,7 @@ pca <- tsol %>%
   prcomp(scale. = TRUE)
 ```
 
-Principal Components Analysis was used for dimensionality-reduction to allow visualisation the distance between samples. It was conducted on protein abundances scaled to unit variance to prevent highly abundant proteins dominating the analysis. The package **`GGally`** [@GGally] was used to produced pairwise scatter plots of the first six principal components.
+Principal Components Analysis was used for dimensionality-reduction to allow visualisation the distance between samples. It was conducted on protein abundances scaled to unit variance to prevent highly abundant proteins dominating the analysis. The package **`GGally`** [@R-GGally] was used to produced pairwise scatter plots of the first six principal components.
 
 ## Clustering and heatmaps {#methods-clustering-and-heatmaps}
 
@@ -329,7 +303,7 @@ n_sigp_0.05 <- length(sol$anova_p[sol$anova_p < 0.05])
 mat <- sol_sigq_0.01 %>% as.matrix()
 ```
 
-Hierarchical clustering was conducted and heatmaps produced with the package **`heatmaply`** [@heatmaply] with interactivity provided by **`plotly`** [@plotly]. Hierarchical clustering used the complete linkage method and was performed for both proteins and samples on the proteins that differed significantly between at least two lines. Significance was determined at the $q < 0.01$ level where $q$ is the False Discovery Rate (FDR) adjusted $p$-value. FDR is a method of correcting for multiple comparisons by the Benjamini–Hochberg procedure [@Benjamini1995-yj]. 
+Hierarchical clustering was conducted and heatmaps produced with the package **`heatmaply`** [@heatmaply2017] with interactivity provided by **`plotly`** [@plotly2020]. Hierarchical clustering used the complete linkage method and was performed for both proteins and samples on the proteins that differed significantly between at least two lines. Significance was determined at the $q < 0.01$ level where $q$ is the False Discovery Rate (FDR) adjusted $p$-value. FDR is a method of correcting for multiple comparisons by the Benjamini–Hochberg procedure [@Benjamini1995-yj]. 
 The abundances were "$z$-score normalised" for each protein before clustering and heatmapping. $Z$-score normalisation is way to make comparisons between, and visualisations of, abundances on different scales. See Equation \@ref(eq:zscore).
 
 
@@ -389,7 +363,7 @@ knitr::include_graphics(file)
 
 <!-- figure legend -->
 
-(ref:protein-venn-fig) Protein set shared by cells lines. Created with package **`VennDiagram`** [@VennDiagram]
+(ref:protein-venn-fig) Protein set shared by cells lines. Created with package **`VennDiagram`** [@R-VennDiagram]
 
 <!-- end of fig legend -->
 
@@ -496,7 +470,7 @@ p1 + inset_element(p2, 0.70, 0.68, 0.9, 0.9)
 ```
 <!-- figure legend -->
 
-(ref:pca-vis-fig) Samples represented on the first six Principal Components capturing `r percent6`% of the variation in soluble protein expression between samples. The leading diagonal shows the distribution of scores on each component with pairwise scatter plots of Principal Components below the diagonal. Created with the **`GGally`** [@GGally] and **`patchwork`** [@patchwork] packages.
+(ref:pca-vis-fig) Samples represented on the first six Principal Components capturing `r percent6`% of the variation in soluble protein expression between samples. The leading diagonal shows the distribution of scores on each component with pairwise scatter plots of Principal Components below the diagonal. Created with the **`GGally`** [@R-GGally] and **`patchwork`** [@R-patchwork] packages.
 
 <!-- end of fig legend -->
 
@@ -589,7 +563,7 @@ writeLines(capture.output(sessionInfo()), file)
 
 ## Word count {#word-count}
 
-Word count calculated with wordcountaddin [@wordcountaddin]. The session information was written into a separate file rather than to the README this has been added to the wordcount.
+Word count calculated with **`wordcountaddin`** [@R-wordcountaddin]. The session information was written into a separate file rather than to the README this has been added to the wordcount.
 
 ```{r wordcount}
 wc_main <- wordcountaddin:::text_stats("main.Rmd")[3] %>%
@@ -601,7 +575,7 @@ wc_readme <- wordcountaddin:::text_stats("../README.md")[3] %>%
 wc_session <- wordcountaddin:::text_stats("../sessioninfo.md")[3] %>%
   str_extract("[0-9]+") %>%
   as.numeric()
-
+knitr::write_bib(c(.packages(), "bookdown"), "packages.bib")
 ```
 
 This document: `r wc_main`\
