@@ -7,23 +7,22 @@
 ## Project Description
 This project investigates the functional heterogeneity of mesenchymal stromal cell (MSC) subtypes using proteomic analysis. MSCs are a subset of non-hematopoietic adult stem cells with the potential to differentiate into multiple cell types, making them crucial for regenerative medicine. However, MSC populations exhibit heterogeneity in their differentiation and immunomodulatory capacities. This study analyzes the soluble protein fraction of five immortalized MSC lines using mass spectrometry to understand differences in protein expression. The analysis includes data preprocessing, normalization, principal component analysis (PCA), hierarchical clustering, and visualization.
 
-## Start Date: UNSURE  
-## Last Updated: UNSURE  
-## Contact Information: Emma Rand (UNSURE, provide email)
+## Start Date: 02-10-2018  
+## Last Updated: Analysis 24-11-2021, README 28-02-2025  
+## Contact Information: Emma Rand (emma.rand@york.ac.uk)
 
 ---
 
 ## Project Organisation
 
 ```
-/msc_proteomics
+/BIO00058M-case-study
 │── data-raw/          # Raw data files
 │   ├── Y101_Y102_Y201_Y202_Y101-5.csv  # Normalized protein abundances
 │   ├── comparison_p_and_q.csv          # Pairwise comparisons p/q values
 │── data/              # Processed data
-│── figures/           # Generated figures (PCA plots, heatmaps, volcano plots)
-│── reports/           # Final report in multiple formats (HTML, PDF, Word)
-│── scripts/           # R scripts for analysis
+│── reports/           # Final report i(HTML) linked above
+│── R/                 # R scripts for analysis
 │   ├── 00-pkg.R       # Loads required packages
 │   ├── data_summary.R # Functions for summary statistics
 │   ├── 01-labels.R    # Cell lineage and functionality labels
@@ -31,8 +30,8 @@ This project investigates the functional heterogeneity of mesenchymal stromal ce
 │   ├── 03-banner.R    # Generates a cell-type banner
 │── sessioninfo.md     # R session information
 │── README.md          # Project documentation
-│── msc_proteomics.Rproj  # RStudio project file
-│── main.Rmd           # R Markdown report for analysis
+│── BIO00058M-case-study.Rproj  # RStudio project file
+
 ```
 
 ---
